@@ -1,0 +1,24 @@
+---
+# Dynamic inventory: finds the application servers by the tags Terraform puts on them
+# (Project / Environment / Role in ec2.tf). Nothing here is secret.
+# Needs AWS credentials on YOUR machine (profile or environment) with ec2:DescribeInstances.
+# Preview what it finds (read-only):  ansible-inventory --graph
+plugin: amazon.aws.aws_ec2
+regions:
+  - us-east-1
+filters:
+  instance-state-name: running
+  tag:Project: drupal-ha
+  tag:Environment: dev
+  tag:Role: drupal-app
+hostnames:
+  - instance-id
+compose:
+  # The SSM connection plugin connects to the instance ID, not an IP address.
+  ansible_host: instance_id
+groups:
+  # Role group: what the playbooks target.
+  drupal_app: "tags.Role == 'drupal-app'"
+  # Transport group: picks up the Systems Manager connection settings
+  # from group_vars/aws_ssm/main.yml.
+  aws_ssm: "instance_id is defined"

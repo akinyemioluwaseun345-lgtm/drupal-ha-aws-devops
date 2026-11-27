@@ -1,0 +1,92 @@
+---
+# All servers must run exactly the same code. The first server resolves the dependencies
+# once and publishes composer.json + composer.lock on the shared EFS volume; every server
+# (including servers added later by Auto Scaling) then runs `composer install` from that lock.
+- name: Check whether the shared composer.lock already exists
+  ansible.builtin.stat:
+    path: "{{ drupal_composer_shared_dir }}/composer.lock"
+  register: drupal_shared_lock_stat
+  run_once: true
+
+- name: Resolve Drupal dependencies once and publish them on EFS
+  when: not drupal_shared_lock_stat.stat.exists
+  run_once: true
+  environment:
+    COMPOSER_ALLOW_SUPERUSER: "1"
+    COMPOSER_MEMORY_LIMIT: "-1"
+  block:
+    - name: Fetch the Drupal recommended project skeleton (no install yet)
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/composer
+          - create-project
+          - "drupal/recommended-project:{{ drupal_version }}"
+          - "{{ drupal_bootstrap_dir }}"
+          - --no-install
+          - --no-interaction
+      args:
+        creates: "{{ drupal_bootstrap_dir }}/composer.json"
+
+    - name: Add Drush and write composer.lock
+      ansible.builtin.command:
+        argv:
+          - /usr/local/bin/composer
+          - require
+          - "drush/drush:{{ drush_version }}"
+          - --no-install
+          - --no-interaction
+          - "--working-dir={{ drupal_bootstrap_dir }}"
+      args:
+        creates: "{{ drupal_bootstrap_dir }}/composer.lock"
+
+    - name: Publish composer.json and composer.lock on the shared volume
+      ansible.builtin.copy:
+        src: "{{ drupal_bootstrap_dir }}/{{ item }}"
+        dest: "{{ drupal_composer_shared_dir }}/{{ item }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+      loop:
+        - composer.json
+        - composer.lock
+
+    - name: Remove the temporary build directory
+      ansible.builtin.file:
+        path: "{{ drupal_bootstrap_dir }}"
+        state: absent
+
+- name: Copy the shared composer files into this server's project directory
+  ansible.builtin.copy:
+    src: "{{ drupal_composer_shared_dir }}/{{ item }}"
+    dest: "{{ drupal_root }}/{{ item }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+  loop:
+    - composer.json
+    - composer.lock
+
+- name: Install the locked dependencies (production, optimised autoloader)
+  ansible.builtin.command:
+    argv:
+      - /usr/local/bin/composer
+      - install
+      - --no-dev
+      - --optimize-autoloader
+      - --no-interaction
+      - "--working-dir={{ drupal_root }}"
+  register: drupal_composer_install
+  changed_when: "'Nothing to install' not in drupal_composer_install.stderr"
+  environment:
+    COMPOSER_ALLOW_SUPERUSER: "1"
+    COMPOSER_MEMORY_LIMIT: "-1"
+
+- name: Point the public files directory at the shared EFS volume
+  ansible.builtin.file:
+    src: "{{ drupal_public_dir }}"
+    dest: "{{ drupal_site_dir }}/files"
+    state: link
+    owner: root
+    group: root

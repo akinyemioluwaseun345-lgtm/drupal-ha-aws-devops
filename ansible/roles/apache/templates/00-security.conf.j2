@@ -1,0 +1,13 @@
+# Managed by Ansible (role: apache). Manual edits will be overwritten.
+ServerTokens {{ apache_server_tokens }}
+ServerSignature Off
+TraceEnable Off
+LogLevel {{ apache_error_log_level }}
+{% if app_port | int != 80 %}
+Listen {{ app_port }}
+{% endif %}
+
+# Behind the Application Load Balancer the TCP peer is the ALB. Trust X-Forwarded-For
+# only when the request comes from inside the VPC, so logs show the real client address.
+RemoteIPHeader X-Forwarded-For
+RemoteIPInternalProxy {{ vpc_cidr }}

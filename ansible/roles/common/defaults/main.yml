@@ -1,0 +1,11 @@
+---
+# Apply only security updates (not every package update) on each run.
+common_apply_security_updates: true
+
+common_packages:
+  - git
+  - unzip
+  - tar
+  - jq
+  - acl
+  - openssl

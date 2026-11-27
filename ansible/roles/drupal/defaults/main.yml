@@ -1,0 +1,33 @@
+---
+# Exact Drupal core release to install (pinned for repeatable builds).
+# Check https://www.drupal.org/project/drupal for the current supported release.
+drupal_version: "11.4.13"
+drush_version: "^13"
+drupal_install_profile: standard
+drupal_site_name: "Drupal HA Demo"
+drupal_admin_user: drupal_admin
+# Placeholder: set your real address in group_vars/all/local.yml.
+drupal_admin_email: "admin@example.com"
+
+# Safety switch: set to false to make sure Ansible can never run an installation.
+drupal_allow_install: true
+
+# Regular expressions of host names Drupal will answer to. Empty = not enforced.
+drupal_trusted_host_patterns: []
+
+# Per-server working paths
+drupal_site_dir: "{{ drupal_docroot }}/sites/default"
+drupal_drush_bin: "{{ drupal_root }}/vendor/bin/drush"
+drupal_drush_home: /var/tmp/drush-home
+drupal_bootstrap_dir: /var/tmp/drupal-bootstrap
+
+# Drush always runs as the web user (never as root).
+drupal_drush_prefix:
+  - runuser
+  - "-u"
+  - "{{ web_user }}"
+  - "--"
+  - env
+  - "HOME={{ drupal_drush_home }}"
+  - "{{ drupal_drush_bin }}"
+  - "--root={{ drupal_docroot }}"

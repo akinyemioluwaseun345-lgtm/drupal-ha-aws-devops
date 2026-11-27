@@ -1,0 +1,18 @@
+---
+# Copy this file to group_vars/all/local.yml (git-ignored) and fill in the values.
+# These are identifiers, not secrets, but they are specific to YOUR deployment.
+
+# terraform output -raw efs_file_system_id
+efs_file_system_id: "fs-0123456789abcdef0"
+
+# Optional: use the ARN instead of the secret name
+# (terraform output -raw db_secret_arn)
+# db_secret_id: "arn:aws:secretsmanager:us-east-1:111122223333:secret:drupal-ha-dev/db-credentials-AbCdEf"
+
+# Optional: restrict Drupal to your real host names (regular expressions).
+# Leave unset until you know the ALB DNS name or your domain.
+# drupal_trusted_host_patterns:
+#   - '^my-alb-1234567890\.us-east-1\.elb\.amazonaws\.com$'
+
+# Your real contact e-mail for the Drupal administrator account.
+# drupal_admin_email: "you@your-domain.example"

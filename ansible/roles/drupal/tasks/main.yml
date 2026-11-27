@@ -1,0 +1,20 @@
+---
+- name: Prepare directories and install Composer
+  ansible.builtin.import_tasks: prepare.yml
+  tags: [drupal_prepare]
+
+- name: Build the Drupal code base
+  ansible.builtin.import_tasks: codebase.yml
+  tags: [drupal_codebase]
+
+- name: Fetch database credentials from AWS Secrets Manager
+  ansible.builtin.import_tasks: credentials.yml
+  tags: [drupal_credentials]
+
+- name: Write Drupal settings
+  ansible.builtin.import_tasks: settings.yml
+  tags: [drupal_settings]
+
+- name: Install Drupal (first run only)
+  ansible.builtin.import_tasks: install.yml
+  tags: [drupal_install]

@@ -1,0 +1,25 @@
+<?php
+// Managed by Ansible (role: healthcheck). Manual edits will be overwritten.
+//
+// Lightweight health check for the Application Load Balancer.
+// It deliberately does NOT bootstrap Drupal and does NOT query the database, so a short
+// database interruption cannot mark every server unhealthy at the same time.
+
+$checks = [
+    'efs_mounted'    => is_file('{{ efs_ready_marker }}'),
+    'drupal_code'    => is_file('{{ drupal_docroot }}/index.php'),
+    'db_credentials' => is_readable('{{ db_credentials_file }}'),
+];
+
+$failed = array_keys(array_filter($checks, static fn (bool $ok): bool => !$ok));
+
+header('Content-Type: text/plain; charset=utf-8');
+header('Cache-Control: no-store');
+
+if ($failed === []) {
+    http_response_code(200);
+    echo "OK\n";
+} else {
+    http_response_code(503);
+    echo 'FAIL: ' . implode(',', $failed) . "\n";
+}

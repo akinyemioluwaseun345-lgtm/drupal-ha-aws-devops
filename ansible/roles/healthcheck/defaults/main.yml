@@ -1,0 +1,4 @@
+---
+healthcheck_dir: /var/www/health
+# Path to give the load balancer (terraform.tfvars: health_check_path = "/healthz").
+healthcheck_path: /healthz

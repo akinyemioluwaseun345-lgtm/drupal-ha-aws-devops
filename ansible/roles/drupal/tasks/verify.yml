@@ -1,0 +1,42 @@
+---
+# Read-only checks. Prints no secrets.
+- name: Gather service facts
+  ansible.builtin.service_facts:
+
+- name: Assert httpd and php-fpm are running
+  ansible.builtin.assert:
+    that:
+      - ansible_facts['services']['httpd.service']['state'] == 'running'
+      - ansible_facts['services']['php-fpm.service']['state'] == 'running'
+    fail_msg: httpd or php-fpm is not running.
+    quiet: true
+
+- name: Assert EFS is mounted
+  ansible.builtin.command: "mountpoint -q {{ efs_mount_point }}"
+  changed_when: false
+
+- name: Health check endpoint answers 200
+  ansible.builtin.uri:
+    url: "http://127.0.0.1{{ healthcheck_path | default('/healthz') }}"
+    status_code: 200
+    return_content: true
+  register: drupal_verify_health
+  changed_when: false
+
+- name: Home page answers 200
+  ansible.builtin.uri:
+    url: http://127.0.0.1/
+    status_code: 200
+    follow_redirects: none
+  changed_when: false
+
+- name: Drupal reports a successful bootstrap
+  ansible.builtin.command:
+    argv: "{{ drupal_drush_prefix + ['status', '--field=bootstrap'] }}"
+  register: drupal_verify_bootstrap
+  changed_when: false
+  failed_when: (drupal_verify_bootstrap.stdout | trim) != 'Successful'
+
+- name: Report
+  ansible.builtin.debug:
+    msg: "{{ inventory_hostname }}: healthy (health check '{{ drupal_verify_health.content | trim }}', Drupal bootstrap Successful)"

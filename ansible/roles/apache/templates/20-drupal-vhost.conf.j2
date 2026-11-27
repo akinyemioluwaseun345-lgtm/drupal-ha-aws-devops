@@ -1,0 +1,21 @@
+# Managed by Ansible (role: apache). Manual edits will be overwritten.
+<VirtualHost *:{{ app_port }}>
+    DocumentRoot "{{ drupal_docroot }}"
+
+    <Directory "{{ drupal_docroot }}">
+        # FollowSymLinks is required: sites/default/files is a symlink to the shared EFS volume.
+        Options -Indexes +FollowSymLinks
+        # Drupal's own .htaccess files provide clean URLs and protect the files directory.
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    # Drupal is installed from the command line (Drush), so the web installer is never needed.
+    # Blocking it removes the whole class of "re-run install.php" attacks.
+    <FilesMatch "^install\.php$">
+        Require all denied
+    </FilesMatch>
+
+    ErrorLog "logs/drupal_error.log"
+    CustomLog "logs/drupal_access.log" combined env=!dontlog
+</VirtualHost>

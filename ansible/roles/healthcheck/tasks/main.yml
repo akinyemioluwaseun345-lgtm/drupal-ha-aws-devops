@@ -1,0 +1,25 @@
+---
+- name: Create the health check directory
+  ansible.builtin.file:
+    path: "{{ healthcheck_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the health check script
+  ansible.builtin.template:
+    src: healthz.php.j2
+    dest: "{{ healthcheck_dir }}/healthz.php"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Publish the health check through Apache
+  ansible.builtin.template:
+    src: healthz.conf.j2
+    dest: /etc/httpd/conf.d/30-healthz.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Reload httpd

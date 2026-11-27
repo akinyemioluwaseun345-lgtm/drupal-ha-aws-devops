@@ -1,0 +1,59 @@
+---
+# Installation runs once for the whole cluster (the database and files are shared), and
+# several independent guards stop it from ever touching an existing site.
+- name: Check whether the installation marker exists on the shared volume
+  ansible.builtin.stat:
+    path: "{{ drupal_install_marker }}"
+  register: drupal_install_marker_stat
+  run_once: true
+
+- name: Confirm Drush can connect to the database
+  ansible.builtin.command:
+    argv: "{{ drupal_drush_prefix + ['status', '--field=db-status'] }}"
+  register: drupal_db_status
+  changed_when: false
+  failed_when: drupal_db_status.rc != 0 or (drupal_db_status.stdout | trim) != 'Connected'
+  run_once: true
+  check_mode: false
+
+- name: Check whether Drupal is already installed in the database
+  ansible.builtin.command:
+    argv: "{{ drupal_drush_prefix + ['status', '--field=bootstrap'] }}"
+  register: drupal_bootstrap_status
+  changed_when: false
+  failed_when: false
+  run_once: true
+  check_mode: false
+
+- name: Install Drupal (only if it is not installed yet)
+  ansible.builtin.command:
+    argv: >-
+      {{ drupal_drush_prefix + [
+        'site:install', drupal_install_profile, '--yes', '--locale=en',
+        '--site-name=' ~ drupal_site_name,
+        '--account-name=' ~ drupal_admin_user,
+        '--account-mail=' ~ drupal_admin_email
+      ] }}
+  when:
+    - drupal_allow_install | bool
+    - (drupal_bootstrap_status.stdout | trim) != 'Successful'
+    - not drupal_install_marker_stat.stat.exists
+  register: drupal_install_result
+  changed_when: true
+  run_once: true
+  # No --account-pass is given, so Drush generates a random administrator password and
+  # prints it. no_log keeps it out of the Ansible output. Sign in with: drush user:login
+  no_log: true
+
+- name: Record on the shared volume that Drupal is installed
+  ansible.builtin.copy:
+    dest: "{{ drupal_install_marker }}"
+    content: "Drupal installed. Managed by Ansible.\n"
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+  when: >-
+    (drupal_bootstrap_status.stdout | trim) == 'Successful'
+    or (drupal_install_result is defined and drupal_install_result is changed)
+  run_once: true

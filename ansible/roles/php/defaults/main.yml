@@ -1,0 +1,41 @@
+---
+php_packages:
+  - "php{{ php_version }}-cli"
+  - "php{{ php_version }}-common"
+  - "php{{ php_version }}-fpm"
+  - "php{{ php_version }}-pdo"
+  - "php{{ php_version }}-mysqlnd"
+  - "php{{ php_version }}-gd"
+  - "php{{ php_version }}-xml"
+  - "php{{ php_version }}-mbstring"
+  - "php{{ php_version }}-opcache"
+  - "php{{ php_version }}-intl"
+  - "php{{ php_version }}-process"
+
+# Modules Drupal and Composer need (lower-case names as printed by `php -m`).
+php_required_modules:
+  - curl
+  - dom
+  - fileinfo
+  - gd
+  - mbstring
+  - pdo_mysql
+  - phar
+  - simplexml
+  - tokenizer
+  - xml
+  - zend opcache
+
+php_memory_limit: 256M
+php_upload_max_filesize: 32M
+php_post_max_size: 32M
+php_max_execution_time: 60
+php_timezone: UTC
+php_opcache_memory: 128
+
+# PHP-FPM pool sizing for a small server (t3.small, 2 GB RAM). Raise with the instance size.
+php_fpm_max_children: 15
+php_fpm_start_servers: 3
+php_fpm_min_spare_servers: 2
+php_fpm_max_spare_servers: 5
+php_fpm_max_requests: 500

@@ -1,0 +1,53 @@
+---
+- name: Create Drupal working directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ drupal_root }}", owner: root, group: root, mode: "0755" }
+    - { path: "{{ db_credentials_file | dirname }}", owner: root, group: "{{ web_group }}", mode: "0750" }
+    - { path: "{{ drupal_drush_home }}", owner: "{{ web_user }}", group: "{{ web_group }}", mode: "0700" }
+  loop_control:
+    label: "{{ item.path }}"
+
+- name: Check whether Composer is already installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/composer
+  register: drupal_composer_stat
+
+- name: Install Composer (official installer, signature verified)
+  when: not drupal_composer_stat.stat.exists
+  block:
+    - name: Fetch the published installer signature
+      ansible.builtin.uri:
+        url: https://composer.github.io/installer.sig
+        return_content: true
+      register: drupal_composer_sig
+      changed_when: false
+      check_mode: false
+
+    - name: Download the Composer installer and verify its checksum
+      ansible.builtin.get_url:
+        url: https://getcomposer.org/installer
+        dest: /var/tmp/composer-setup.php
+        checksum: "sha384:{{ drupal_composer_sig.content | trim }}"
+        mode: "0644"
+
+    - name: Run the Composer installer
+      ansible.builtin.command:
+        argv:
+          - /usr/bin/php
+          - /var/tmp/composer-setup.php
+          - --2
+          - --install-dir=/usr/local/bin
+          - --filename=composer
+      args:
+        creates: /usr/local/bin/composer
+
+    - name: Remove the installer
+      ansible.builtin.file:
+        path: /var/tmp/composer-setup.php
+        state: absent

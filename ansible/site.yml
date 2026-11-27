@@ -1,0 +1,57 @@
+---
+# Full configuration of the Drupal application servers.
+# Run only when you are ready to configure real servers:
+#   ansible-playbook site.yml
+- name: Pre-flight checks (run locally, change nothing)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Require the EFS file system ID from Terraform
+      ansible.builtin.assert:
+        that:
+          - efs_file_system_id is match('^fs-[0-9a-f]+$')
+        fail_msg: >-
+          efs_file_system_id is not set. Run 'terraform output -raw efs_file_system_id' and put
+          the value in group_vars/all/local.yml (see local.yml.example) or pass it with -e.
+        quiet: true
+
+    - name: Require the web server port to be 80
+      ansible.builtin.assert:
+        that:
+          - app_port | int == 80
+        fail_msg: These roles currently configure Apache for port 80 only (Terraform default app_port).
+        quiet: true
+
+    - name: Require the Systems Manager file-transfer bucket when using the SSM connection
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.env', 'ANSIBLE_AWS_SSM_BUCKET_NAME') | length > 0
+        fail_msg: >-
+          Export ANSIBLE_AWS_SSM_BUCKET_NAME (the name of a private S3 bucket you created) first.
+          See the README section "Connection method".
+        quiet: true
+      when: groups['aws_ssm'] | default([]) | length > 0
+
+- name: Configure Drupal application servers
+  hosts: drupal_app
+  become: true
+  gather_facts: true
+  # One server at a time: the other server keeps serving traffic while one is configured.
+  # Use -e rolling_batch_size=100% to configure all servers at once.
+  serial: "{{ rolling_batch_size | default(1) }}"
+  max_fail_percentage: 0
+  roles:
+    - role: common
+      tags: [common]
+    - role: php
+      tags: [php]
+    - role: apache
+      tags: [apache]
+    - role: efs
+      tags: [efs]
+    - role: drupal
+      tags: [drupal]
+    - role: healthcheck
+      tags: [healthcheck]

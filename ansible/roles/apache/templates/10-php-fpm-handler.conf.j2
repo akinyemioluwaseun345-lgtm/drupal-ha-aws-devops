@@ -1,0 +1,6 @@
+# Managed by Ansible (role: apache). Manual edits will be overwritten.
+# Hand every .php file to PHP-FPM over its local socket (event MPM + proxy_fcgi).
+<FilesMatch "\.php$">
+    SetHandler "proxy:unix:{{ php_fpm_socket }}|fcgi://localhost"
+</FilesMatch>
+DirectoryIndex index.php index.html

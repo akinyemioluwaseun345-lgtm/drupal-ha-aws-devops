@@ -1,0 +1,12 @@
+---
+# Post-deployment checks, run on the servers themselves. Read-only; prints no secrets.
+#   ansible-playbook verify.yml
+- name: Verify the Drupal application servers
+  hosts: drupal_app
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run the verification tasks
+      ansible.builtin.include_role:
+        name: drupal
+        tasks_from: verify.yml

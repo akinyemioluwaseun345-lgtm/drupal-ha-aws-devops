@@ -1,0 +1,94 @@
+---
+- name: Install PHP and the extensions Drupal needs
+  ansible.builtin.dnf:
+    name: "{{ php_packages }}"
+    state: present
+  notify: Restart php-fpm
+
+- name: Check that the php command exists
+  ansible.builtin.stat:
+    path: /usr/bin/php
+  register: php_cli_stat
+
+- name: Fail early if the php command is missing
+  ansible.builtin.assert:
+    that:
+      - php_cli_stat.stat.exists
+    fail_msg: >-
+      /usr/bin/php was not found after installing php{{ php_version }}-cli. On a host with several PHP
+      versions, select one with 'alternatives --config php' or adjust php_version.
+    quiet: true
+
+- name: List the loaded PHP modules
+  ansible.builtin.command: /usr/bin/php -m
+  register: php_modules_raw
+  changed_when: false
+  check_mode: false
+
+- name: Assert every PHP module Drupal needs is loaded
+  ansible.builtin.assert:
+    that:
+      - item in (php_modules_raw.stdout_lines | map('lower') | list)
+    fail_msg: "PHP module '{{ item }}' is missing. Install the matching php{{ php_version }}-* package (see php_packages)."
+    quiet: true
+  loop: "{{ php_required_modules }}"
+
+- name: Install PHP settings for Drupal
+  ansible.builtin.template:
+    src: php-drupal.ini.j2
+    dest: /etc/php.d/90-drupal.ini
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart php-fpm
+
+- name: Configure the PHP-FPM pool (user, socket and process limits)
+  ansible.builtin.lineinfile:
+    path: /etc/php-fpm.d/www.conf
+    regexp: '^;?\s*{{ item.key | regex_escape }}\s*='
+    line: "{{ item.key }} = {{ item.value }}"
+  loop:
+    - { key: user, value: "{{ web_user }}" }
+    - { key: group, value: "{{ web_group }}" }
+    - { key: listen, value: "{{ php_fpm_socket }}" }
+    - { key: pm, value: dynamic }
+    - { key: pm.max_children, value: "{{ php_fpm_max_children }}" }
+    - { key: pm.start_servers, value: "{{ php_fpm_start_servers }}" }
+    - { key: pm.min_spare_servers, value: "{{ php_fpm_min_spare_servers }}" }
+    - { key: pm.max_spare_servers, value: "{{ php_fpm_max_spare_servers }}" }
+    - { key: pm.max_requests, value: "{{ php_fpm_max_requests }}" }
+  loop_control:
+    label: "{{ item.key }}"
+  notify: Restart php-fpm
+
+- name: Create the systemd drop-in directory for PHP-FPM
+  ansible.builtin.file:
+    path: /etc/systemd/system/php-fpm.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Restart PHP-FPM automatically if it crashes (systemd drop-in)
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/php-fpm.service.d/restart.conf
+    content: |
+      # Managed by Ansible (role: php)
+      [Service]
+      Restart=on-failure
+      RestartSec=5
+    owner: root
+    group: root
+    mode: "0644"
+  register: php_restart_dropin
+
+- name: Reload systemd after changing the drop-in
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: php_restart_dropin is changed
+
+- name: Ensure PHP-FPM is enabled and running
+  ansible.builtin.systemd_service:
+    name: php-fpm
+    enabled: true
+    state: started

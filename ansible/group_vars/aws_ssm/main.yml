@@ -1,0 +1,10 @@
+---
+# Connection settings for hosts in the "aws_ssm" group (no SSH, no key pair, no public IP).
+# Ansible talks to the instance through AWS Systems Manager Session Manager.
+ansible_connection: amazon.aws.aws_ssm
+ansible_aws_ssm_region: "{{ aws_region }}"
+# The plugin needs an S3 bucket for file transfer. Terraform does not create one.
+# Create a private bucket yourself and export its name (never commit credentials):
+#   export ANSIBLE_AWS_SSM_BUCKET_NAME=my-private-ansible-ssm-bucket
+ansible_aws_ssm_bucket_name: "{{ lookup('ansible.builtin.env', 'ANSIBLE_AWS_SSM_BUCKET_NAME') }}"
+ansible_become: true

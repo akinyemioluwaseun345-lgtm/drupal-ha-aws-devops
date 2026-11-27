@@ -1,0 +1,33 @@
+---
+# Read-only connectivity test: proves Ansible can reach the servers through Systems Manager.
+# Changes nothing on the servers.
+#   ansible-playbook check_connectivity.yml
+- name: Pre-flight checks (run locally, change nothing)
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Require the Systems Manager file-transfer bucket when using the SSM connection
+      ansible.builtin.assert:
+        that:
+          - lookup('ansible.builtin.env', 'ANSIBLE_AWS_SSM_BUCKET_NAME') | length > 0
+        fail_msg: Export ANSIBLE_AWS_SSM_BUCKET_NAME first (see README, "Connection method").
+        quiet: true
+      when: groups['aws_ssm'] | default([]) | length > 0
+
+- name: Check that the application servers are reachable
+  hosts: drupal_app
+  gather_facts: false
+  tasks:
+    - name: Ping through the configured connection
+      ansible.builtin.ping:
+
+    - name: Collect minimal facts
+      ansible.builtin.setup:
+        gather_subset:
+          - min
+
+    - name: Show operating system
+      ansible.builtin.debug:
+        msg: "{{ inventory_hostname }} runs {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"

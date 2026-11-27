@@ -1,0 +1,57 @@
+---
+# Renders every Jinja2 template on YOUR machine with dummy values and writes the results
+# to /tmp. It connects to nothing, needs no AWS account and changes no server:
+#   ansible-playbook -i localhost, -c local tests/render_templates.yml
+# Then read the files in /tmp/ansible-template-test/ and check them by eye.
+- name: Render all templates locally with dummy values
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  become: false
+  vars:
+    render_dir: /tmp/ansible-template-test
+    role_dir: "{{ playbook_dir }}/../roles"
+  tasks:
+    - name: Load shared variables and role defaults
+      ansible.builtin.include_vars:
+        file: "{{ item }}"
+      loop:
+        - "{{ playbook_dir }}/../group_vars/all/main.yml"
+        - "{{ role_dir }}/common/defaults/main.yml"
+        - "{{ role_dir }}/php/defaults/main.yml"
+        - "{{ role_dir }}/apache/defaults/main.yml"
+        - "{{ role_dir }}/efs/defaults/main.yml"
+        - "{{ role_dir }}/drupal/defaults/main.yml"
+        - "{{ role_dir }}/healthcheck/defaults/main.yml"
+
+    - name: Use dummy test values (fake, not real infrastructure)
+      ansible.builtin.set_fact:
+        efs_file_system_id: fs-0123456789abcdef0
+        drupal_trusted_host_patterns:
+          - '^example\.com$'
+
+    - name: Create the output directory
+      ansible.builtin.file:
+        path: "{{ render_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Render each template
+      ansible.builtin.template:
+        src: "{{ role_dir }}/{{ item.src }}"
+        dest: "{{ render_dir }}/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: php/templates/php-drupal.ini.j2, dest: 90-drupal.ini }
+        - { src: apache/templates/00-security.conf.j2, dest: 00-security.conf }
+        - { src: apache/templates/10-php-fpm-handler.conf.j2, dest: 10-php-fpm-handler.conf }
+        - { src: apache/templates/20-drupal-vhost.conf.j2, dest: 20-drupal-vhost.conf }
+        - { src: healthcheck/templates/healthz.conf.j2, dest: 30-healthz.conf }
+        - { src: healthcheck/templates/healthz.php.j2, dest: healthz.php }
+        - { src: drupal/templates/settings.php.j2, dest: settings.php }
+      loop_control:
+        label: "{{ item.dest }}"
+
+    - name: Show where the results are
+      ansible.builtin.debug:
+        msg: "Rendered files are in {{ render_dir }}"

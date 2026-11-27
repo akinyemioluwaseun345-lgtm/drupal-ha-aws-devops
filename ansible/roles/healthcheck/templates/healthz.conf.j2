@@ -1,0 +1,14 @@
+# Managed by Ansible (role: healthcheck). Manual edits will be overwritten.
+# Serve the health check straight from Apache (outside the Drupal document root), so it
+# works before Drupal is installed and is unaffected by Drupal's rewrite rules or
+# trusted-host settings.
+Alias {{ healthcheck_path }} {{ healthcheck_dir }}/healthz.php
+
+<Directory "{{ healthcheck_dir }}">
+    Options None
+    AllowOverride None
+    Require all granted
+</Directory>
+
+# Keep the load balancer's frequent probes out of the access log.
+SetEnvIf Request_URI "^{{ healthcheck_path }}$" dontlog

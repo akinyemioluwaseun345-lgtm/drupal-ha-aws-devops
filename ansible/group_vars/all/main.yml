@@ -1,0 +1,42 @@
+---
+# Values shared by every role. They mirror the Terraform configuration in ../terraform
+# (terraform.tfvars defaults). If you change terraform.tfvars, change them here too.
+
+# --- From Terraform ----------------------------------------------------------
+aws_region: us-east-1                          # terraform.tfvars: aws_region
+project_name: drupal-ha                        # terraform.tfvars: project_name
+env_name: dev                                  # terraform.tfvars: environment ("environment" is a reserved word in Ansible)
+name_prefix: "{{ project_name }}-{{ env_name }}"
+vpc_cidr: "10.0.0.0/16"                        # terraform.tfvars: vpc_cidr (ALB/NAT traffic comes from inside it)
+app_port: 80                                   # terraform.tfvars: app_port
+
+# REQUIRED, no safe default: run `terraform output -raw efs_file_system_id` and put the
+# result in group_vars/all/local.yml (see local.yml.example) or pass it with -e.
+efs_file_system_id: ""
+
+# Secrets Manager secret created by database.tf: "<project>-<env>/db-credentials".
+# You may replace it with the ARN from `terraform output -raw db_secret_arn`.
+db_secret_id: "{{ name_prefix }}/db-credentials"
+
+# --- Users and software versions --------------------------------------------
+web_user: apache
+web_group: apache
+php_version: "8.3"                             # Drupal 11 needs PHP 8.3 or newer
+php_fpm_socket: /run/php-fpm/www.sock
+
+# --- Layout on the servers ---------------------------------------------------
+drupal_root: /var/www/drupal                   # Composer project (code lives on each server's local disk)
+drupal_docroot: "{{ drupal_root }}/web"        # Apache DocumentRoot
+db_credentials_file: /etc/drupal/db-credentials.json
+
+# --- Layout on the shared EFS file system -------------------------------------
+efs_mount_point: /mnt/efs
+efs_ready_marker: "{{ efs_mount_point }}/.efs-ready"
+drupal_shared_dir: "{{ efs_mount_point }}/drupal"
+drupal_public_dir: "{{ drupal_shared_dir }}/public"            # sites/default/files points here
+drupal_private_dir: "{{ drupal_shared_dir }}/private"          # private file system
+drupal_config_sync_dir: "{{ drupal_shared_dir }}/config/sync"  # Drupal configuration sync
+drupal_composer_shared_dir: "{{ drupal_shared_dir }}/composer" # composer.json + composer.lock shared by all servers
+drupal_secrets_dir: "{{ drupal_shared_dir }}/secrets"
+drupal_hash_salt_file: "{{ drupal_secrets_dir }}/hash_salt.txt"
+drupal_install_marker: "{{ drupal_shared_dir }}/.drupal-installed"

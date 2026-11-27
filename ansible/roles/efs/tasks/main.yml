@@ -1,0 +1,53 @@
+---
+- name: Install the Amazon EFS mount helper
+  ansible.builtin.dnf:
+    name: amazon-efs-utils
+    state: present
+
+- name: Create the mount point
+  ansible.builtin.file:
+    path: "{{ efs_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Mount the shared EFS file system and persist it in /etc/fstab
+  ansible.posix.mount:
+    src: "{{ efs_file_system_id }}:/"
+    path: "{{ efs_mount_point }}"
+    fstype: efs
+    opts: "{{ efs_mount_options }}"
+    state: mounted
+
+- name: Confirm the file system is really mounted
+  ansible.builtin.command: "mountpoint -q {{ efs_mount_point }}"
+  changed_when: false
+  check_mode: false
+
+- name: Leave a marker so the health check can tell EFS is mounted
+  ansible.builtin.copy:
+    dest: "{{ efs_ready_marker }}"
+    content: "Shared EFS volume for Drupal. Managed by Ansible.\n"
+    owner: root
+    group: root
+    mode: "0644"
+    force: false
+
+- name: Create the shared Drupal directories on EFS
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ drupal_shared_dir }}", owner: root, group: root, mode: "0755" }
+    - { path: "{{ drupal_public_dir }}", owner: "{{ web_user }}", group: "{{ web_group }}", mode: "0775" }
+    - { path: "{{ drupal_private_dir }}", owner: "{{ web_user }}", group: "{{ web_group }}", mode: "0770" }
+    - { path: "{{ drupal_shared_dir }}/config", owner: root, group: root, mode: "0755" }
+    - { path: "{{ drupal_config_sync_dir }}", owner: "{{ web_user }}", group: "{{ web_group }}", mode: "0750" }
+    - { path: "{{ drupal_composer_shared_dir }}", owner: root, group: root, mode: "0755" }
+    - { path: "{{ drupal_secrets_dir }}", owner: root, group: "{{ web_group }}", mode: "0750" }
+  loop_control:
+    label: "{{ item.path }}"

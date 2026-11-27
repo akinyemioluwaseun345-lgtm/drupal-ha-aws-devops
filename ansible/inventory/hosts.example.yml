@@ -1,0 +1,18 @@
+---
+# EXAMPLE static inventory. Copy to a file name outside git (for example
+# inventory/hosts.yml), replace the placeholder instance IDs, and use it with -i.
+# The IDs below are fake. Real IDs come from:
+#   terraform output autoscaling_group_name
+#   aws autoscaling describe-auto-scaling-groups --auto-scaling-group-names <name>
+all:
+  children:
+    drupal_app:
+      hosts:
+        i-0123456789abcdef0:
+          ansible_host: i-0123456789abcdef0
+        i-0fedcba9876543210:
+          ansible_host: i-0fedcba9876543210
+    aws_ssm:
+      hosts:
+        i-0123456789abcdef0:
+        i-0fedcba9876543210:

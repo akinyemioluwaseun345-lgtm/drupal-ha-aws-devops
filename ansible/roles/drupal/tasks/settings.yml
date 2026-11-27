@@ -1,0 +1,21 @@
+---
+- name: Create the hash salt once, on the shared volume
+  ansible.builtin.shell: |
+    set -euo pipefail
+    umask 0027
+    openssl rand -hex 32 > "{{ drupal_hash_salt_file }}"
+    chgrp "{{ web_group }}" "{{ drupal_hash_salt_file }}"
+    chmod 0640 "{{ drupal_hash_salt_file }}"
+  args:
+    executable: /bin/bash
+    creates: "{{ drupal_hash_salt_file }}"
+  run_once: true
+  no_log: true
+
+- name: Write settings.php (contains no secrets)
+  ansible.builtin.template:
+    src: settings.php.j2
+    dest: "{{ drupal_site_dir }}/settings.php"
+    owner: root
+    group: "{{ web_group }}"
+    mode: "0440"

@@ -1,0 +1,51 @@
+<?php
+
+// phpcs:ignoreFile
+// Managed by Ansible (role: drupal). Manual edits will be overwritten.
+// This file contains NO secrets. The database password is read at run time from a
+// root-owned file that is fetched from AWS Secrets Manager (see credentials.yml).
+
+// Must be identical on every server (sessions, form tokens, one-time links).
+// It lives on the shared EFS volume and is created once.
+$settings['hash_salt'] = trim((string) file_get_contents('{{ drupal_hash_salt_file }}'));
+
+$settings['config_sync_directory'] = '{{ drupal_config_sync_dir }}';
+$settings['file_private_path'] = '{{ drupal_private_dir }}';
+$settings['update_free_access'] = FALSE;
+$settings['entity_update_batch_size'] = 50;
+
+// The Application Load Balancer terminates the client connection. Trust its forwarded
+// headers, but only from addresses inside the VPC.
+$settings['reverse_proxy'] = TRUE;
+$settings['reverse_proxy_addresses'] = ['{{ vpc_cidr }}'];
+$settings['reverse_proxy_trusted_headers'] = \Symfony\Component\HttpFoundation\Request::HEADER_X_FORWARDED_AWS_ELB;
+
+{% if drupal_trusted_host_patterns | length > 0 %}
+$settings['trusted_host_patterns'] = [
+{% for pattern in drupal_trusted_host_patterns %}
+  '{{ pattern }}',
+{% endfor %}
+];
+{% endif %}
+
+// Database connection: read from the Secrets Manager copy on this server.
+$drupal_db_file = '{{ db_credentials_file }}';
+$drupal_db = is_readable($drupal_db_file)
+  ? json_decode((string) file_get_contents($drupal_db_file), TRUE)
+  : NULL;
+
+if (is_array($drupal_db)) {
+  $databases['default']['default'] = [
+    'driver' => 'mysql',
+    'database' => $drupal_db['dbname'],
+    'username' => $drupal_db['username'],
+    'password' => $drupal_db['password'],
+    'host' => $drupal_db['host'],
+    'port' => (string) $drupal_db['port'],
+    'prefix' => '',
+    'collation' => 'utf8mb4_general_ci',
+    'namespace' => 'Drupal\\mysql\\Driver\\Database\\mysql',
+    'autoload' => 'core/modules/mysql/src/Driver/Database/mysql/',
+  ];
+}
+unset($drupal_db, $drupal_db_file);

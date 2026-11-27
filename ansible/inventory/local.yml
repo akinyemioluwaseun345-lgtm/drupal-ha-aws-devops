@@ -1,0 +1,12 @@
+---
+# Fallback inventory for running Ansible ON an application server itself
+# (opened through a Session Manager shell). No S3 bucket is needed in this mode.
+# See the README section "Alternative: run Ansible on the instance".
+# Use it with:  ansible-playbook -i inventory/local.yml site.yml
+all:
+  children:
+    drupal_app:
+      hosts:
+        localhost:
+          ansible_connection: local
+          ansible_become: true
